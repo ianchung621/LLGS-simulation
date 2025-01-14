@@ -53,11 +53,11 @@ Define the simulation parameters such as Gilbert damping coefficient and externa
 from core.LLGS_simulation import LLGS_Simulation_2D
 
 sim = LLGS_Simulation_2D(honeycomb)
-sim.set_exchange_field(H_E = H_E) # exchange field
-sim.set_H_ext(H_ext = H_ext) # external magnetic field
+sim.set_exchange_field(H_E = H_E) # exchange field, unit: Tesla
+sim.set_H_ext(H_ext = H_ext) # external magnetic field, unit: Tesla
 sim.setup(alpha = 0.1, # Gilbert damping coefficient
-          H_para = NiPS3_params['H_para'], # in-plane anisotropy
-          H_perp = NiPS3_params['H_perp'], # out-of-plane anisotropy 
+          H_para = NiPS3_params['H_para'], # in-plane anisotropy, unit: Tesla
+          H_perp = NiPS3_params['H_perp'], # out-of-plane anisotropy, unit: Tesla
           io_foldername = "Data/NiPS3", # folder to save data
           io_filename = "results_RK4", # the data file name
           method = "RK4" # support Euler, RK2, RK4
@@ -70,7 +70,7 @@ Run the simulation for a specified number of steps and save the results:
 
 ```
 sim.evolve(honeycomb, 
-           dt = 2e-4, 
+           dt = 2e-4, # time step, unit: ps
            max_iters = 50000)
 ```
 
