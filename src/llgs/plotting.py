@@ -1,7 +1,7 @@
 """Visualization helpers for lattices and simulation results."""
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Tuple, Union
+from typing import TYPE_CHECKING, Literal, Tuple, Union
 
 import matplotlib.animation as animation
 import matplotlib.colors as colors
@@ -15,12 +15,49 @@ if TYPE_CHECKING:
     from .lattice import Lattice_2D
     from .read_results import ReadResult
 
+DARK_THEME = {
+    "style": "dark_background",
+    "spin_cmap": "bwr",
+    "lattice_color": "yellow",
+    "unit_cell_edge_color": "blue",
+    "unit_cell_face_color": "lightblue",
+}
+
+LIGHT_THEME = {
+    "style": "default",
+    "spin_cmap": colors.LinearSegmentedColormap.from_list(
+        "light_spin",
+        ["#2563eb", "#1f2937", "#dc2626"],
+    ),
+    "lattice_color": "black",
+    "unit_cell_edge_color": "navy",
+    "unit_cell_face_color": "lightblue",
+}
+
+Theme = Union[Literal["light", "dark"], dict]
+
+
+def _resolve_theme(theme: Theme) -> dict:
+    if theme == "dark":
+        return DARK_THEME
+    if theme == "light":
+        return LIGHT_THEME
+    if isinstance(theme, dict):
+        return {**DARK_THEME, **theme}
+    raise ValueError("theme must be 'light', 'dark', or a theme dictionary")
+
+
+def _resolve_cmap(cmap):
+    return cmap if isinstance(cmap, colors.Colormap) else plt.get_cmap(cmap)
+
 
 def _plot_lattice(
     lattice: "Lattice_2D",
     arrowscale: float = 0.3,
     annotate_idx: bool = False,
     draw_unitcell: bool = False,
+    display: bool = True,
+    theme: Theme = "dark",
 ) -> Tuple[Figure, Axes]:
     """Plot lattice positions and the current spin configuration."""
     x = lattice.positions[:, 0]
@@ -28,45 +65,49 @@ def _plot_lattice(
     sx = lattice.spins[:, 0]
     sy = lattice.spins[:, 1]
     sz = lattice.spins[:, 2]
+    theme = _resolve_theme(theme)
 
-    plt.style.use("dark_background")
-    plt.set_cmap("bwr")
-    fig, ax = plt.subplots()
-    cmap = plt.get_cmap("bwr")
-    norm = colors.Normalize(vmin=-1, vmax=1)
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    plt.colorbar(sm, ax=ax)
-    ax.scatter(x, y, c="yellow", s=2)
-    if np.linalg.norm(sx) == np.linalg.norm(sy) == 0 and np.linalg.norm(sz) != 0:
-        ax.scatter(x, y, c=sz, s=2, norm=norm)
-    elif np.linalg.norm(sx) != 0 or np.linalg.norm(sy) != 0:
-        ax.quiver(x, y, sx * arrowscale, sy * arrowscale, sz, norm=norm)
-    if annotate_idx:
-        for index, (x_position, y_position) in enumerate(zip(x, y)):
-            ax.annotate(
-                str(index),
-                (x_position, y_position),
-                xycoords="data",
-                xytext=(1.5, 1.5),
-                textcoords="offset points",
+    with plt.style.context(theme["style"]):
+        fig, ax = plt.subplots()
+        cmap = _resolve_cmap(theme["spin_cmap"])
+        norm = colors.Normalize(vmin=-1, vmax=1)
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        fig.colorbar(sm, ax=ax)
+        ax.scatter(x, y, c=theme["lattice_color"], s=2)
+        if np.linalg.norm(sx) == np.linalg.norm(sy) == 0 and np.linalg.norm(sz) != 0:
+            ax.scatter(x, y, c=sz, s=2, norm=norm, cmap=cmap)
+        elif np.linalg.norm(sx) != 0 or np.linalg.norm(sy) != 0:
+            ax.quiver(
+                x, y, sx * arrowscale, sy * arrowscale, sz, norm=norm, cmap=cmap
             )
+        if annotate_idx:
+            for index, (x_position, y_position) in enumerate(zip(x, y)):
+                ax.annotate(
+                    str(index),
+                    (x_position, y_position),
+                    xycoords="data",
+                    xytext=(1.5, 1.5),
+                    textcoords="offset points",
+                )
 
-    if draw_unitcell:
-        if not lattice.has_geometry:
-            raise ValueError("geometry is required to draw the unit cell")
-        origin = np.zeros(2)
-        opposite_corner = lattice.r_a + lattice.r_b
-        unit_cell = Polygon(
-            [origin, lattice.r_a, opposite_corner, lattice.r_b],
-            closed=True,
-            edgecolor="blue",
-            facecolor="lightblue",
-            alpha=0.5,
-        )
-        ax.add_patch(unit_cell)
+        if draw_unitcell:
+            if not lattice.has_geometry:
+                raise ValueError("geometry is required to draw the unit cell")
+            origin = np.zeros(2)
+            opposite_corner = lattice.r_a + lattice.r_b
+            unit_cell = Polygon(
+                [origin, lattice.r_a, opposite_corner, lattice.r_b],
+                closed=True,
+                edgecolor=theme["unit_cell_edge_color"],
+                facecolor=theme["unit_cell_face_color"],
+                alpha=0.5,
+            )
+            ax.add_patch(unit_cell)
 
-    ax.set_aspect("equal")
-    ax.axis("off")
+        ax.set_aspect("equal")
+        ax.axis("off")
+    if display:
+        plt.show()
     return fig, ax
 
 
@@ -75,22 +116,23 @@ def _animate(
     period: int,
     save_fn: Union[str, Path],
     fps: int = 10,
+    display: bool = True,
+    theme: Theme = "dark",
 ) -> animation.FuncAnimation:
     """Animate saved spin data and write it to a GIF or video file."""
     if result.structure.shape[1] < 5:
         raise ValueError("structure must include x and y coordinates")
     if period <= 0:
         raise ValueError("period must be positive")
+    theme = _resolve_theme(theme)
 
-    plt.style.use("dark_background")
-    plt.set_cmap("bwr")
-
-    fig, ax = plt.subplots()
-    line = ax.plot([], [])
-    cmap = plt.get_cmap("bwr")
-    norm = colors.Normalize(vmin=-1, vmax=1)
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    plt.colorbar(sm, ax=ax)
+    with plt.style.context(theme["style"]):
+        fig, ax = plt.subplots()
+        line = ax.plot([], [])
+        cmap = _resolve_cmap(theme["spin_cmap"])
+        norm = colors.Normalize(vmin=-1, vmax=1)
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        fig.colorbar(sm, ax=ax)
 
     def initialize():
         return line
@@ -100,12 +142,13 @@ def _animate(
         x, y = result.structure[:, 3], result.structure[:, 4]
         sx, sy, sz = result.spin_datas[frame].T
 
-        ax.clear()
-        ax.scatter(x, y, c="yellow", s=1)
-        ax.quiver(x, y, sx * 0.3, sy * 0.3, sz, norm=norm)
-        ax.set_aspect("equal")
-        ax.axis("off")
-        ax.set_title(f"time = {result.times[frame]:0.2f} ps")
+        with plt.style.context(theme["style"]):
+            ax.clear()
+            ax.scatter(x, y, c=theme["lattice_color"], s=1)
+            ax.quiver(x, y, sx * 0.3, sy * 0.3, sz, norm=norm, cmap=cmap)
+            ax.set_aspect("equal")
+            ax.axis("off")
+            ax.set_title(f"time = {result.times[frame]:0.2f} ps")
         return line
 
     frame_count = max(1, len(result.times) // period)
@@ -117,4 +160,6 @@ def _animate(
         blit=True,
     )
     output.save(save_fn, fps=fps)
+    if display:
+        plt.show()
     return output

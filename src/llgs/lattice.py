@@ -1,3 +1,5 @@
+from typing import Literal, Union
+
 import numpy as np
 
 
@@ -135,8 +137,34 @@ class Lattice_2D:
         self.spins += perturb * np.random.normal(0, 1, (self.N, 3))
         self.spins = normalize(self.spins)
 
-    def plot(self, arrowscale=0.3, annotate_idx=False, draw_unitcell=False):
-        """Plot this lattice and its current spin configuration."""
+    def plot(
+        self,
+        arrowscale=0.3,
+        annotate_idx=False,
+        draw_unitcell=False,
+        display=True,
+        theme: Union[Literal["light", "dark"], dict] = "dark",
+    ):
+        """Plot this lattice and its current spin configuration.
+
+        Parameters
+        ----------
+        arrowscale : float, default 0.3
+            Scale applied to in-plane spin arrows.
+        annotate_idx : bool, default False
+            Label each lattice site with its particle index.
+        draw_unitcell : bool, default False
+            Draw the unit-cell boundary. Geometry must be available.
+        display : bool, default True
+            Show the figure with Matplotlib when true.
+        theme : {"light", "dark"} or dict, default "dark"
+            Built-in theme name or custom values overriding ``DARK_THEME``.
+
+        Returns
+        -------
+        tuple
+            Matplotlib ``(figure, axes)`` objects.
+        """
         from .plotting import _plot_lattice
 
         return _plot_lattice(
@@ -144,4 +172,6 @@ class Lattice_2D:
             arrowscale=arrowscale,
             annotate_idx=annotate_idx,
             draw_unitcell=draw_unitcell,
+            display=display,
+            theme=theme,
         )
