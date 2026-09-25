@@ -17,9 +17,8 @@ The `lattice.py` module allows you to define a spin lattice. Here's an example o
 ```python
 from llgs.lattice import lattice_2D
 
-honeycomb = lattice_2D(n_a = 10, n_b = 8, n_site = 2) # 10 unit-cell on a-axis, 8 on b-axis, each unit cell contains 2 sites
-
-honeycomb.set_position(
+honeycomb = lattice_2D(
+    n_a = 10, n_b = 8, n_site = 2,
     r_a = np.array([np.sqrt(3), 0]), # basis vector in a-axis
     r_b = np.array([0.5*np.sqrt(3), 1.5]), # basis vector in b-axis
     r_site = np.array((
@@ -53,16 +52,17 @@ Define the simulation parameters such as Gilbert damping coefficient and externa
 from llgs.LLGS_simulation import LLGS_Simulation_2D
 from param.NiPS3 import NiPS3_params
 
-sim = LLGS_Simulation_2D(honeycomb)
-sim.set_exchange_field(H_E = H_E) # exchange field, unit: Tesla
-sim.set_H_ext(H_ext = H_ext) # external magnetic field, unit: Tesla
-sim.setup(alpha = 0.1, # Gilbert damping coefficient
-          H_para = NiPS3_params['H_para'], # in-plane anisotropy, unit: Tesla
-          H_perp = NiPS3_params['H_perp'], # out-of-plane anisotropy, unit: Tesla
-          io_foldername = "Data/NiPS3", # folder to save data
-          io_filename = "results_RK4", # the data file name
-          method = "RK4" # support Euler, RK2, RK4
-          )
+sim = LLGS_Simulation_2D(
+    honeycomb,
+    H_E = H_E, # exchange field, unit: Tesla
+    H_ext = H_ext, # external magnetic field, unit: Tesla
+    alpha = 0.1, # Gilbert damping coefficient
+    H_para = NiPS3_params['H_para'], # in-plane anisotropy, unit: Tesla
+    H_perp = NiPS3_params['H_perp'], # out-of-plane anisotropy, unit: Tesla
+    io_foldername = "Data/NiPS3", # folder to save data
+    io_filename = "results_RK4", # the data file name
+    method = "RK4" # support Euler, RK2, RK4
+)
 ```
 
 ### 4. Running the Simulation
@@ -70,8 +70,7 @@ sim.setup(alpha = 0.1, # Gilbert damping coefficient
 Run the simulation for a specified number of steps and save the results:
 
 ```
-sim.evolve(honeycomb, 
-           dt = 2e-4, # time step, unit: ps
+sim.evolve(dt = 2e-4, # time step, unit: ps
            max_iters = 50000)
 ```
 

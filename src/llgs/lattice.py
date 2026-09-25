@@ -1,91 +1,79 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.colors as mplcolors
+import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.patches import Polygon
 
+
 def normalize(spins):
-    return spins/np.linalg.norm(spins, axis = 1, keepdims=True)
+    return spins / np.linalg.norm(spins, axis=1, keepdims=True)
+
 
 class lattice_2D:
+    def __init__(self, n_a, n_b, n_site, r_a=None, r_b=None, r_site=None):
+        """Create a two-dimensional spin lattice with optional geometry."""
+        geometry = (r_a, r_b, r_site)
+        if any(value is not None for value in geometry) and not all(
+            value is not None for value in geometry
+        ):
+            raise ValueError("r_a, r_b, and r_site must be provided together")
 
-    def __init__(self,n_a,n_b,n_site):
-        '''
-        param 
-        ------------------------------------------------
-        n_a: number of Bragg basis in a-axis 
-        n_b: number of Bragg basis in b-axis 
-        n_site: number of particle in one Bragg basis
-        
-        attr:
-        -------------------------------------------------
-        N: number of particle
-        _tags:  (N,3) index of each particle, columns: a,b,site
-        _position: (N,2) for each particle
-        _spins: (N,3) for each particle
-        _spin_volocities: (N,3) for each particle
-        '''
         self.n_site = n_site
         self.n_a = n_a
         self.n_b = n_b
-        N = n_site*n_a*n_b
-        self.N = N
+        self.N = n_site * n_a * n_b
 
-        a, b, s = np.meshgrid( 
-            np.arange(n_a), 
-            np.arange(n_b), 
+        a, b, site = np.meshgrid(
+            np.arange(n_a),
+            np.arange(n_b),
             np.arange(n_site),
-            indexing='ij'
+            indexing="ij",
         )
-        self._tags = np.stack((a.ravel(), b.ravel(), s.ravel()), axis=1).astype(int)
-        self._positions=np.zeros((N,2))
-        self._positions_initialized = False
-        self._spins=np.zeros((N,3))
-        self._spin_velocities=np.zeros((N,3))
-        return
-    
-    #getter
-    def get_tags(self):
-        """
-        -------
-        (N,3):
-        row: i th particle
-        column: a, b, site
-        """
-        return self._tags
-    def get_positions(self): 
-        return self._positions
-    def get_spins(self):
-        return self._spins
-    def get_spin_velocities(self):
-        return self._spin_velocities
-    def get_structure(self) -> np.ndarray:
-        """
-        Returns
-        -------
-        np.ndarray
-            Columns are a, b, site, followed by x, y after set_position.
-        """
-        if self._positions_initialized:
-            return np.column_stack((self._tags, self._positions))
-        return self._tags.copy()
+        self.tags = np.stack(
+            (a.ravel(), b.ravel(), site.ravel()), axis=1
+        ).astype(int)
+        self.positions = np.zeros((self.N, 2))
+        self.spins = np.zeros((self.N, 3))
+        self.spin_velocities = np.zeros((self.N, 3))
 
-    #setter
-    def set_spins(self,spins):
-        self._spins = spins
-        return 
-    def set_spin_velocities(self,vel):
-        self._spin_velocities = vel
-        return
-    
-    def output_lattice_structure(self,fn):
-        """
-        Write lattice data into a file named "fn"
-        """
-        structure = self.get_structure()
-        output = np.column_stack((np.arange(self.N), structure))
+        self.r_a = None
+        self.r_b = None
+        self.r_site = None
+        self.has_geometry = all(value is not None for value in geometry)
+
+        if self.has_geometry:
+            self.r_a = np.asarray(r_a)
+            self.r_b = np.asarray(r_b)
+            self.r_site = np.asarray(r_site)
+            if self.r_a.shape != (2,):
+                raise ValueError(
+                    f"r_a must be a (2,) array, but got shape {self.r_a.shape}."
+                )
+            if self.r_b.shape != (2,):
+                raise ValueError(
+                    f"r_b must be a (2,) array, but got shape {self.r_b.shape}."
+                )
+            if self.r_site.shape != (self.n_site, 2):
+                raise ValueError(
+                    f"r_site must be a ({self.n_site}, 2) array, "
+                    f"but got shape {self.r_site.shape}."
+                )
+
+            a, b, site = self.tags.T
+            self.positions = (
+                a[:, None] * self.r_a
+                + b[:, None] * self.r_b
+                + self.r_site[site]
+            )
+            self.structure = np.column_stack((self.tags, self.positions))
+        else:
+            self.structure = self.tags.copy()
+
+    def output_lattice_structure(self, fn):
+        """Write lattice data to a CSV file."""
+        output = np.column_stack((np.arange(self.N), self.structure))
         columns = ["particle idx", "a", "b", "site"]
         formats = ["%d"] * 4
-        if self._positions_initialized:
+        if self.has_geometry:
             columns.extend(("x", "y"))
             formats.extend(("%.18e", "%.18e"))
         np.savetxt(
@@ -96,69 +84,21 @@ class lattice_2D:
             comments="",
             fmt=formats,
         )
-        return
-    
-    
-    def set_position(self, r_a:np.ndarray, r_b:np.ndarray, r_site:np.ndarray):
-        """
-        ----------------------------------------
-        r_a: (2,) basis vector on a axis for x, y coordinate
-        r_b: (2,) basis vector on b axis for x, y coordinate 
-        r_site: (n_site,2) x,y coordinate for each site
-        
-        """
-        if r_a.shape != (2,):
-            raise ValueError(f"r_a must be a (2,) array, but got shape {r_a.shape}.")
-        if r_b.shape != (2,):
-            raise ValueError(f"r_b must be a (2,) array, but got shape {r_b.shape}.")
-        # Check the dimensions of r_site
-        if r_site.shape != (self.n_site, 2):
-            raise ValueError(f"r_site must be a ({self.n_site}, 2) array, but got shape {r_site.shape}.")
-
-        self.r_a = r_a
-        self.r_b = r_b
-        self.r_site = r_site
-
-
-        a, b, s = np.meshgrid(
-            np.arange(self.n_a), 
-            np.arange(self.n_b), 
-            np.arange(self.n_site), 
-            indexing='ij'
-        )
-        
-        a = a.flatten()
-        b = b.flatten()
-        s = s.flatten()
-
-        if self.n_site == 1:
-            
-            r_site_x, r_site_y = r_site[0]  
-            self._positions[:, 0] = a * r_a[0] + b * r_b[0] + r_site_x
-            self._positions[:, 1] = a * r_a[1] + b * r_b[1] + r_site_y
-        else:
-            self._positions[:, 0] = a * r_a[0] + b * r_b[0] + r_site[s, 0]
-            self._positions[:, 1] = a * r_a[1] + b * r_b[1] + r_site[s, 1]
-        self._positions_initialized = True
-        return
 
     def initialize_spin(self, condition_dict, perturb=0.0):
-        """
-        Parameters:
-        ----------
-        condition_dict : dict[str, np.ndarray (3)]
-            Maps NumPy expressions using a, b, site, x, or y to spin vectors.
-        """
+        """Initialize spins from NumPy expressions over lattice coordinates."""
         condition_values = {
-            "a": self._tags[:, 0],
-            "b": self._tags[:, 1],
-            "site": self._tags[:, 2],
+            "a": self.tags[:, 0],
+            "b": self.tags[:, 1],
+            "site": self.tags[:, 2],
         }
-        if self._positions_initialized:
-            condition_values.update({
-                "x": self._positions[:, 0],
-                "y": self._positions[:, 1],
-            })
+        if self.has_geometry:
+            condition_values.update(
+                {
+                    "x": self.positions[:, 0],
+                    "y": self.positions[:, 1],
+                }
+            )
 
         for cond_str, spin in condition_dict.items():
             cond = np.asarray(
@@ -169,60 +109,53 @@ class lattice_2D:
                 raise ValueError(
                     f"condition must produce shape ({self.N},), got {cond.shape}"
                 )
-            self._spins[cond] = spin
-        
-        self._spins +=  perturb * np.random.normal(0,1,(self.N,3))
-        self._spins = normalize(self._spins)
+            self.spins[cond] = spin
 
-        return
+        self.spins += perturb * np.random.normal(0, 1, (self.N, 3))
+        self.spins = normalize(self.spins)
 
-
-
-    def plot(self, arrowscale=0.3, annotate_idx = False, draw_unitcell = False):
-        x = self.get_positions()[:,0]
-        y = self.get_positions()[:,1]
-        sx = self.get_spins()[:,0]
-        sy = self.get_spins()[:,1]
-        sz = self.get_spins()[:,2]
+    def plot(self, arrowscale=0.3, annotate_idx=False, draw_unitcell=False):
+        x = self.positions[:, 0]
+        y = self.positions[:, 1]
+        sx = self.spins[:, 0]
+        sy = self.spins[:, 1]
+        sz = self.spins[:, 2]
 
         plt.style.use("dark_background")
-        plt.set_cmap('bwr')
-        fig, ax =plt.subplots()
+        plt.set_cmap("bwr")
+        fig, ax = plt.subplots()
         cmap = plt.get_cmap("bwr")
         norm = mplcolors.Normalize(vmin=-1, vmax=1)
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-        plt.colorbar(sm,ax=ax)
-        ax.scatter(x,y,c = 'yellow', s = 2)
+        plt.colorbar(sm, ax=ax)
+        ax.scatter(x, y, c="yellow", s=2)
         if np.linalg.norm(sx) == np.linalg.norm(sy) == 0 and np.linalg.norm(sz) != 0:
-            ax.scatter(x,y,c=sz, s = 2, norm=norm)
+            ax.scatter(x, y, c=sz, s=2, norm=norm)
         elif np.linalg.norm(sx) != 0 or np.linalg.norm(sy) != 0:
-            ax.quiver(x,y,sx*arrowscale,sy*arrowscale,sz,norm=norm)
+            ax.quiver(x, y, sx * arrowscale, sy * arrowscale, sz, norm=norm)
         if annotate_idx:
-            for (i, (x,y)) in enumerate(zip(x,y)):
-                ax.annotate(str(i), (x,y),  xycoords='data',
-                xytext=(1.5, 1.5), textcoords='offset points')
-        
+            for i, (x_pos, y_pos) in enumerate(zip(x, y)):
+                ax.annotate(
+                    str(i),
+                    (x_pos, y_pos),
+                    xycoords="data",
+                    xytext=(1.5, 1.5),
+                    textcoords="offset points",
+                )
+
         if draw_unitcell:
+            if not self.has_geometry:
+                raise ValueError("geometry is required to draw the unit cell")
             origin = np.zeros(2)
-            v1 = self.r_a
-            v2 = self.r_b
-            v3 = v1 + v2
-            unit_cell = Polygon([origin, v1, v3, v2], closed=True, edgecolor='blue', facecolor='lightblue', alpha=0.5)
+            v3 = self.r_a + self.r_b
+            unit_cell = Polygon(
+                [origin, self.r_a, v3, self.r_b],
+                closed=True,
+                edgecolor="blue",
+                facecolor="lightblue",
+                alpha=0.5,
+            )
             ax.add_patch(unit_cell)
 
-        ax.set_aspect('equal')
+        ax.set_aspect("equal")
         ax.axis("off")
-        
-        return
-
-
-
-
-
-
-
-
-
-
-
-

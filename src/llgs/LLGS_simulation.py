@@ -41,80 +41,54 @@ def calculate_spin_velocities_jit(H_E,H_perp,H_para,phi_a,H_DMI,H_ext,H_FL,H_DL,
     
 class LLGS_Simulation_2D:
 
-    def __init__(self, lattice:lattice_2D) :
+    def __init__(
+        self,
+        lattice: lattice_2D,
+        *,
+        H_E=None,
+        H_DMI_x=None,
+        H_DMI_y=None,
+        H_DMI_z=None,
+        H_ext=None,
+        H_FL=None,
+        H_DL=None,
+        H_perp=0,
+        H_para=0,
+        phi_a=0,
+        alpha=0,
+        method="RK4",
+        io_foldername="lattice",
+        io_filename=None,
+        io_compress=True,
+        io_screen=True,
+    ):
         self.lattice = lattice
         self.N = lattice.N
-        self.setup()
-        self._H_E = np.zeros((self.N,self.N))
-        self._H_DMI_x = np.zeros((self.N,self.N))
-        self._H_DMI_y = np.zeros((self.N,self.N))
-        self._H_DMI_z = np.zeros((self.N,self.N))
-        self._H_ext = np.zeros(3)
-        self._H_FL = np.zeros(3)
-        self._H_DL = np.zeros(3)
-        return
-    
-    def setup(self, H_perp=0,
-                    H_para=0,
-                    phi_a=0,
-                    alpha=0,
-                    method='RK4', 
-                    io_foldername="lattice",
-                    io_filename=None,
-                    io_compress=True,
-                    io_screen=True,
-                    ):
-        """
-        param:
-        ----------------------------------------------
-        H_perp: perpendicular anisotropy
-        H_para: inplane anisotropy
-        phi_a: angle between x axis and inplane easy axis 
-        alpha: Gilbert damping constant
-        method: string, the numerical scheme, support 'Euler','RK2','RK4'
-        io_freq: int, the frequency to outupt data.
-        io_foldername: the output folder name, default: lattice
-        io_filename: if None, the file name will be results_{method}.h5
-        io_compress: If True, compress the output data file
-        io_screen: print message on screen or not
-        """
-        self._H_perp = H_perp
-        self._H_para = H_para
-        self._phi_a = phi_a
-        self._alpha = alpha
+        self.H_E = np.zeros((self.N, self.N)) if H_E is None else np.asarray(H_E)
+        self.H_DMI_x = (
+            np.zeros((self.N, self.N)) if H_DMI_x is None else np.asarray(H_DMI_x)
+        )
+        self.H_DMI_y = (
+            np.zeros((self.N, self.N)) if H_DMI_y is None else np.asarray(H_DMI_y)
+        )
+        self.H_DMI_z = (
+            np.zeros((self.N, self.N)) if H_DMI_z is None else np.asarray(H_DMI_z)
+        )
+        self.H_ext = np.zeros(3) if H_ext is None else np.asarray(H_ext)
+        self.H_FL = np.zeros(3) if H_FL is None else np.asarray(H_FL)
+        self.H_DL = np.zeros(3) if H_DL is None else np.asarray(H_DL)
+        self.H_perp = H_perp
+        self.H_para = H_para
+        self.phi_a = phi_a
+        self.alpha = alpha
         self.method = method
-        self._io_foldername = io_foldername
-        if io_filename is None:
-            self._io_filename = f'results_{method}'
-        self._io_compress = io_compress
-        self._io_screen = io_screen
-        return
+        self.io_foldername = io_foldername
+        self.io_filename = f"results_{method}" if io_filename is None else io_filename
+        self.io_compress = io_compress
+        self.io_screen = io_screen
     
-    #setter
-    def set_exchange_field(self,H_E:np.ndarray):
-        self._H_E = (H_E + H_E.T)/2
-        return
-    def set_DMI_field_x(self,H_DMI_X:np.ndarray):
-        self._H_DMI_x = (H_DMI_X - H_DMI_X.T)/2
-        return
-    def set_DMI_field_y(self,H_DMI_Y:np.ndarray):
-        self._H_DMI_y = (H_DMI_Y - H_DMI_Y.T)/2
-        return
-    def set_DMI_field_z(self,H_DMI_Z:np.ndarray):
-        self._H_DMI_z = (H_DMI_Z - H_DMI_Z.T)/2
-        return
-    def set_H_ext(self,H_ext):
-        self._H_ext = H_ext
-        return
-    def set_H_FL(self,H_FL):
-        self._H_FL = H_FL
-        return
-    def set_H_DL(self,H_DL):
-        self._H_DL = H_DL
-        return
-    
-    def evolve(self, lattice:lattice_2D,
-               dt:float=0.01, max_iters:int = 1000, restore_initial_state = True):
+    def evolve(self, dt:float=0.01, max_iters:int = 1000,
+               restore_initial_state = True):
         """
         param:
         -----------------------------------------------
@@ -133,8 +107,8 @@ class LLGS_Simulation_2D:
             3rd dim: spin (Sx,Sy,Sz)
         """
         if restore_initial_state:
-            initial_spins = np.copy(lattice.get_spins())
-            initial_svels = np.copy(lattice.get_spin_velocities())
+            initial_spins = np.copy(self.lattice.spins)
+            initial_svels = np.copy(self.lattice.spin_velocities)
 
         method = self.method
         if method=="Euler":
@@ -146,44 +120,52 @@ class LLGS_Simulation_2D:
         else:
             raise ValueError("method must be 'Euler','RK2','RK4'")
         
-        Path(self._io_foldername).mkdir(parents=True, exist_ok=True)
+        Path(self.io_foldername).mkdir(parents=True, exist_ok=True)
 
         record = np.zeros((max_iters, self.N, 3))
-        structure = lattice.get_structure()
+        structure = self.lattice.structure
 
-        if np.all(self._H_DMI_x == 0) and np.all(self._H_DMI_y == 0) and np.all(self._H_DMI_z == 0):
+        H_E = np.asarray(self.H_E)
+        H_E = (H_E + H_E.T) / 2
+
+        H_DMI_components = []
+        for component in (self.H_DMI_x, self.H_DMI_y, self.H_DMI_z):
+            component = np.asarray(component)
+            H_DMI_components.append((component - component.T) / 2)
+
+        if all(np.all(component == 0) for component in H_DMI_components):
             H_DMI = None
         else:
-            H_DMI = np.stack([self._H_DMI_x, self._H_DMI_y, self._H_DMI_z])
+            H_DMI = np.stack(H_DMI_components)
         
-        iters = tqdm(range(max_iters), desc='simulation') if self._io_screen else range(max_iters)
+        iters = tqdm(range(max_iters), desc='simulation') if self.io_screen else range(max_iters)
         for n in iters:
             
             
-            spins = lattice.get_spins()
-            svels = lattice.get_spin_velocities()
-            next_spins, next_svels = _get_next_spin(H_E = self._H_E,
-                                                    H_perp = self._H_perp,
-                                                    H_para = self._H_para,
-                                                    phi_a= self._phi_a,
+            spins = self.lattice.spins
+            svels = self.lattice.spin_velocities
+            next_spins, next_svels = _get_next_spin(H_E = H_E,
+                                                    H_perp = self.H_perp,
+                                                    H_para = self.H_para,
+                                                    phi_a= self.phi_a,
                                                     H_DMI = H_DMI,
-                                                    H_ext = self._H_ext,
-                                                    H_FL = self._H_FL,
-                                                    H_DL = self._H_DL,
-                                                    alpha = self._alpha,
+                                                    H_ext = self.H_ext,
+                                                    H_FL = self.H_FL,
+                                                    H_DL = self.H_DL,
+                                                    alpha = self.alpha,
                                                     spins = spins,
                                                     svels = svels,
                                                     dt = dt
                                                     )
             record[n] = spins
-            lattice.set_spins(next_spins)
-            lattice.set_spin_velocities(next_svels)
+            self.lattice.spins = next_spins
+            self.lattice.spin_velocities = next_svels
         
-        if self._io_screen:
-            print(f"saving data to {self._io_foldername}/{self._io_filename}.h5 ...")
+        if self.io_screen:
+            print(f"saving data to {self.io_foldername}/{self.io_filename}.h5 ...")
             
-        with h5py.File(f'{self._io_foldername}/{self._io_filename}.h5', 'w') as f:
-            if self._io_compress:
+        with h5py.File(f'{self.io_foldername}/{self.io_filename}.h5', 'w') as f:
+            if self.io_compress:
                 f.create_dataset("spin data", (max_iters, self.N, 3), data = record, 
                                 chunks = (1000, self.N, 3))
             else:
@@ -193,10 +175,10 @@ class LLGS_Simulation_2D:
             f.attrs['dt'] = dt
         
         if restore_initial_state:
-            lattice.set_spins(initial_spins)
-            lattice.set_spin_velocities(initial_svels)
+            self.lattice.spins = initial_spins
+            self.lattice.spin_velocities = initial_svels
         
-        if self._io_screen:
+        if self.io_screen:
             print("simulation is done")
 
         return record
