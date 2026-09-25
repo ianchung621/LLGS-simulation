@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mplcolors
 from matplotlib.patches import Polygon
-import pandas as pd
 
 def normalize(spins):
     return spins/np.linalg.norm(spins, axis = 1, keepdims=True)
@@ -39,12 +38,9 @@ class lattice_2D:
         )
         self._tags = np.stack((a.ravel(), b.ravel(), s.ravel()), axis=1).astype(int)
         self._positions=np.zeros((N,2))
+        self._positions_initialized = False
         self._spins=np.zeros((N,3))
         self._spin_velocities=np.zeros((N,3))
-        self.structure = pd.DataFrame(data = {'a':self._tags[:,0],
-                                        'b':self._tags[:,1],
-                                        'site':self._tags[:,2],}).astype(int)
-        self.structure.index.name = 'particle idx'
         return
     
     #getter
@@ -62,15 +58,16 @@ class lattice_2D:
         return self._spins
     def get_spin_velocities(self):
         return self._spin_velocities
-    def get_structure(self) -> pd.DataFrame:
+    def get_structure(self) -> np.ndarray:
         """
         Returns
         -------
-        pd.DataFrame
-            idx: particle idx
-            col: a, b, site, x, y (x,y available if set_position)
+        np.ndarray
+            Columns are a, b, site, followed by x, y after set_position.
         """
-        return self.structure
+        if self._positions_initialized:
+            return np.column_stack((self._tags, self._positions))
+        return self._tags.copy()
 
     #setter
     def set_spins(self,spins):
@@ -84,7 +81,21 @@ class lattice_2D:
         """
         Write lattice data into a file named "fn"
         """
-        self.structure.to_csv(fn)
+        structure = self.get_structure()
+        output = np.column_stack((np.arange(self.N), structure))
+        columns = ["particle idx", "a", "b", "site"]
+        formats = ["%d"] * 4
+        if self._positions_initialized:
+            columns.extend(("x", "y"))
+            formats.extend(("%.18e", "%.18e"))
+        np.savetxt(
+            fn,
+            output,
+            delimiter=",",
+            header=",".join(columns),
+            comments="",
+            fmt=formats,
+        )
         return
     
     
@@ -128,20 +139,36 @@ class lattice_2D:
         else:
             self._positions[:, 0] = a * r_a[0] + b * r_b[0] + r_site[s, 0]
             self._positions[:, 1] = a * r_a[1] + b * r_b[1] + r_site[s, 1]
-        self.structure['x'] = self._positions[:, 0]
-        self.structure['y'] = self._positions[:, 1]
+        self._positions_initialized = True
         return
 
     def initialize_spin(self, condition_dict, perturb=0.0):
         """
         Parameters:
         ----------
-        conditions : dict[str, np.ndarray (3)]
-            A dictionary mapping string conditions (evaluated on `structure`) to spin vectors.
+        condition_dict : dict[str, np.ndarray (3)]
+            Maps NumPy expressions using a, b, site, x, or y to spin vectors.
         """
-        
+        condition_values = {
+            "a": self._tags[:, 0],
+            "b": self._tags[:, 1],
+            "site": self._tags[:, 2],
+        }
+        if self._positions_initialized:
+            condition_values.update({
+                "x": self._positions[:, 0],
+                "y": self._positions[:, 1],
+            })
+
         for cond_str, spin in condition_dict.items():
-            cond = self.structure.eval(cond_str)
+            cond = np.asarray(
+                eval(cond_str, {"__builtins__": {}}, condition_values),
+                dtype=bool,
+            )
+            if cond.shape != (self.N,):
+                raise ValueError(
+                    f"condition must produce shape ({self.N},), got {cond.shape}"
+                )
             self._spins[cond] = spin
         
         self._spins +=  perturb * np.random.normal(0,1,(self.N,3))
@@ -187,7 +214,6 @@ class lattice_2D:
         ax.axis("off")
         
         return
-
 
 
 

@@ -149,7 +149,7 @@ class LLGS_Simulation_2D:
         Path(self._io_foldername).mkdir(parents=True, exist_ok=True)
 
         record = np.zeros((max_iters, self.N, 3))
-        structure = lattice.get_structure().values
+        structure = lattice.get_structure()
 
         if np.all(self._H_DMI_x == 0) and np.all(self._H_DMI_y == 0) and np.all(self._H_DMI_z == 0):
             H_DMI = None
@@ -259,4 +259,3 @@ def _get_next_spin_rk4(H_E,H_perp,H_para,phi_a,H_DMI,H_ext,H_FL,H_DL,alpha,
                                             next_spins,svels)
 
     return next_spins, next_svels
-
