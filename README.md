@@ -1,16 +1,18 @@
 # LLGS Simulation
 
-This repository provides a framework for simulating and analyzing spin dynamics using the Landau-Lifshitz-Gilbert-Slonczewski (LLGS) equation on 2D lattice. Supports antiferromagnetism and spin orbit torque.
+This package provides tools for simulating and analyzing spin dynamics using
+the Landau-Lifshitz-Gilbert-Slonczewski (LLGS) equation on two-dimensional
+lattices. It supports antiferromagnetic exchange, DMI, anisotropy, external
+fields, and spin-orbit torque.
 
 ## Install
 
-LLGS Simulation requires Python 3.9 or newer. Install it directly from
-[GitHub](https://github.com/ianchung621/LLGS-simulation):
+LLGS Simulation requires Python 3.9 or newer:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install git+https://github.com/ianchung621/LLGS-simulation.git
+python -m pip install llgs-simulation
 ```
 
 ## Example Usage
@@ -22,53 +24,69 @@ Below is a step-by-step demonstration of how to use the repository to simulate s
 The `lattice.py` module allows you to define a spin lattice. Here's an example of creating a hexagonal lattice:
 
 ```python
+import numpy as np
+
 from llgs import Lattice_2D
 
 honeycomb = Lattice_2D(
-    n_a = 10, n_b = 8, n_site = 2,
-    r_a = [np.sqrt(3), 0], # basis vector in a-axis
-    r_b = [0.5*np.sqrt(3), 1.5], # basis vector in b-axis
-    r_site = [
-    [1/3, 1/3], # fractional coordinates of first site
-    [2/3, 2/3] # fractional coordinates of second site
-    ]
+    n_a=10,
+    n_b=8,
+    n_site=2,
+    r_a=[np.sqrt(3), 0],
+    r_b=[0.5 * np.sqrt(3), 1.5],
+    r_site=[
+        [1 / 3, 1 / 3],
+        [2 / 3, 2 / 3],
+    ],
 )
 honeycomb.plot(draw_unitcell=True)
 ```
 
-![Honeycomb Lattice](doc/lattice.png)
+![Honeycomb lattice](https://raw.githubusercontent.com/ianchung621/LLGS-simulation/main/doc/lattice.png)
 
 ### 2. Initializing Spins
 
 Initialize the spins on the lattice to a desired configuration:
 
 ```python
-ZigZag_config = {"b % 2 == 0": np.array([1,0,0]),
-                "b % 2 == 1": np.array([-1,0,0])}
-honeycomb.initialize_spin(ZigZag_config)
+zigzag_config = {
+    "b % 2 == 0": np.array([1, 0, 0]),
+    "b % 2 == 1": np.array([-1, 0, 0]),
+}
+honeycomb.initialize_spin(zigzag_config)
 honeycomb.plot()
 ```
 
-![Honeycomb Lattice](doc/spin_initialized.png)
+![Initialized spins](https://raw.githubusercontent.com/ianchung621/LLGS-simulation/main/doc/spin_initialized.png)
 
 ### 3. Setting Up Parameters for Simulation
 
-Define the simulation parameters such as Gilbert damping coefficient and external magnetic field:
+Build the exchange matrix from exact lattice bonds, then configure the
+simulation. Each bond is `(source_site, target_site, cell_offset, coupling)`;
+the reverse bond is added automatically.
 
 ```python
-from llgs import LLGS_Simulation_2D
-from param.NiPS3 import NiPS3_params
+from llgs import LLGS_Simulation_2D, build_exchange
+
+J1 = -11.2  # exchange-matrix coefficient, Tesla
+exchange_bonds = [
+    (0, 1, (0, 0), J1),
+    (1, 0, (0, 1), J1),
+    (1, 0, (1, 0), J1),
+]
+H_E = build_exchange(honeycomb, exchange_bonds)
+H_ext = np.array([5.0, 5.0, 0.0])
 
 sim = LLGS_Simulation_2D(
     honeycomb,
-    H_E = H_E, # exchange field, unit: Tesla
-    H_ext = H_ext, # external magnetic field, unit: Tesla
-    alpha = 0.1, # Gilbert damping coefficient
-    H_para = NiPS3_params['H_para'], # in-plane anisotropy, unit: Tesla
-    H_perp = NiPS3_params['H_perp'], # out-of-plane anisotropy, unit: Tesla
-    io_foldername = "Data/NiPS3", # folder to save data
-    io_filename = "results_RK4", # the data file name
-    method = "RK4" # support Euler, RK2, RK4
+    H_E=H_E,
+    H_ext=H_ext,
+    alpha=0.1,
+    H_para=0.086,
+    H_perp=1.812,
+    io_foldername="Data",
+    io_filename="results_RK4",
+    method="RK4",
 )
 ```
 
@@ -83,9 +101,8 @@ Cartesian component. Dense DMI remains a `(3, N, N)` array. Use
 
 Run the simulation for a specified number of steps and save the results:
 
-```
-sim.evolve(dt = 2e-4, # time step, unit: ps
-           max_iters = 50000)
+```python
+sim.evolve(dt=2e-4, max_iters=1000)
 ```
 
 ### 5. Visualizing Spin Dynamics
@@ -95,22 +112,21 @@ The `read_result.py` module reads the simulation results and creates visualizati
 ```python
 from llgs import ReadResult
 
-# Read the results from the HDF5 file
-results = ReadResult(f'Data/NiPS3/results_RK4.h5')
+results = ReadResult("Data/results_RK4.h5")
 
-# Create an animation of spin dynamics and save to gif or mp4
-results.animate(period=50, save_fn='Data/NiPS3/movie.gif')
+results.animate(period=50, save_fn="Data/movie.gif")
 ```
 
 ### Example Output
 
 Here is an example of how the animation might look:
 
-![Spin Dynamics Animation](doc/spin_animation.gif)
+![Spin dynamics animation](https://raw.githubusercontent.com/ianchung621/LLGS-simulation/main/doc/spin_animation.gif)
 
 ### Additional Details
 
-For a comprehensive explanation of the methods, equations, and parameters used, please refer to the accompanying Jupyter Notebook: [example.ipynb](./example.ipynb).
+For a comprehensive explanation of the methods, equations, and parameters,
+see the [example notebook](https://github.com/ianchung621/LLGS-simulation/blob/main/example.ipynb).
 
 This notebook includes:
 - Detailed descriptions of lattice construction.

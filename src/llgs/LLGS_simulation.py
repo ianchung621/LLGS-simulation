@@ -167,6 +167,9 @@ class LLGS_Simulation_2D:
             2nd dim: particle idx
             3rd dim: spin (Sx,Sy,Sz)
         """
+        if max_iters <= 0:
+            raise ValueError("max_iters must be positive")
+
         if restore_initial_state:
             initial_spins = np.copy(self.lattice.spins)
             initial_svels = np.copy(self.lattice.spin_velocities)
@@ -224,12 +227,10 @@ class LLGS_Simulation_2D:
             print(f"saving data to {self.io_foldername}/{self.io_filename}.h5 ...")
             
         with h5py.File(f'{self.io_foldername}/{self.io_filename}.h5', 'w') as f:
+            dataset_options = {"chunks": (min(1000, max_iters), self.N, 3)}
             if self.io_compress:
-                f.create_dataset("spin data", (max_iters, self.N, 3), data = record, 
-                                chunks = (1000, self.N, 3))
-            else:
-                f.create_dataset("spin data", (max_iters, self.N, 3), data = record, 
-                                chunks = (1000, self.N, 3))
+                dataset_options["compression"] = "gzip"
+            f.create_dataset("spin data", data=record, **dataset_options)
             f.create_dataset("structure", structure.shape, data = structure)
             f.attrs['dt'] = dt
         
@@ -275,21 +276,21 @@ def _get_next_spin_rk2(H_E,H_perp,H_para,phi_a,H_DMI,H_ext,H_FL,H_DL,alpha,
 def _get_next_spin_rk4(H_E,H_perp,H_para,phi_a,H_DMI,H_ext,H_FL,H_DL,alpha,
                     spins,svels, dt):
 
-    spins_i = spins
+    spins_i = spins.copy()
     #k2
-    spins += dt/2*svels
+    spin2 = spins_i + dt/2*svels
     svel2 = calculate_spin_velocities_jit(H_E,H_perp,H_para,phi_a,H_DMI,H_ext,H_FL,H_DL,alpha,
-                                        spins,svels)
+                                        spin2,svels)
     
     #k3
-    spins += dt/2*svel2
+    spin3 = spins_i + dt/2*svel2
     svel3 = calculate_spin_velocities_jit(H_E,H_perp,H_para,phi_a,H_DMI,H_ext,H_FL,H_DL,alpha,
-                                        spins,svels)                                            
+                                        spin3,svels)
     
     #k4
-    spins += dt*svels
+    spin4 = spins_i + dt*svel3
     svel4 = calculate_spin_velocities_jit(H_E,H_perp,H_para,phi_a,H_DMI,H_ext,H_FL,H_DL,alpha,
-                                        spins,svels)
+                                        spin4,svels)
                                             
 
 
@@ -344,24 +345,24 @@ def _get_next_spin_rk4_csr(
     H_DMI_data, H_DMI_indices, H_DMI_indptr, has_DMI,
     H_ext, H_FL, H_DL, alpha, spins, svels, dt,
 ):
-    spins_i = spins
-    spins += dt / 2 * svels
+    spins_i = spins.copy()
+    spin2 = spins_i + dt / 2 * svels
     svel2 = calculate_spin_velocities_csr_jit(
         H_E_data, H_E_indices, H_E_indptr, H_perp, H_para, phi_a,
         H_DMI_data, H_DMI_indices, H_DMI_indptr, has_DMI,
-        H_ext, H_FL, H_DL, alpha, spins, svels,
+        H_ext, H_FL, H_DL, alpha, spin2, svels,
     )
-    spins += dt / 2 * svel2
+    spin3 = spins_i + dt / 2 * svel2
     svel3 = calculate_spin_velocities_csr_jit(
         H_E_data, H_E_indices, H_E_indptr, H_perp, H_para, phi_a,
         H_DMI_data, H_DMI_indices, H_DMI_indptr, has_DMI,
-        H_ext, H_FL, H_DL, alpha, spins, svels,
+        H_ext, H_FL, H_DL, alpha, spin3, svels,
     )
-    spins += dt * svels
+    spin4 = spins_i + dt * svel3
     svel4 = calculate_spin_velocities_csr_jit(
         H_E_data, H_E_indices, H_E_indptr, H_perp, H_para, phi_a,
         H_DMI_data, H_DMI_indices, H_DMI_indptr, has_DMI,
-        H_ext, H_FL, H_DL, alpha, spins, svels,
+        H_ext, H_FL, H_DL, alpha, spin4, svels,
     )
     next_spins = normalize(spins_i + dt / 6 * (svels + 2 * svel2 + 2 * svel3 + svel4))
     next_svels = calculate_spin_velocities_csr_jit(

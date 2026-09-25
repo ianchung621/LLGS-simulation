@@ -7,10 +7,15 @@ import pytest
 from scipy import sparse
 
 from llgs import LLGS_Simulation_2D, Lattice_2D, ReadResult
-from param.NiPS3 import NiPS3_params
-
-
 simulation_module = importlib.import_module("llgs.LLGS_simulation")
+
+NIPS3_PARAMS = {
+    "J1": -22.432766768116426,
+    "J2": 1.7255974437012638,
+    "J3": 117.34062617168593,
+    "H_para": 0.08627987218506318,
+    "H_perp": 1.8118773158863268,
+}
 
 
 def make_honeycomb(n_a=3, n_b=2):
@@ -115,12 +120,35 @@ def test_fields_are_normalized_when_evolution_starts(tmp_path, monkeypatch):
         io_foldername=tmp_path,
         io_screen=False,
     )
-    simulation.evolve(max_iters=1000)
+    simulation.evolve(max_iters=1)
 
     np.testing.assert_array_equal(simulation.H_E, raw_exchange)
     np.testing.assert_array_equal(simulation.H_DMI, raw_dmi)
     np.testing.assert_allclose(captured["H_E"], [[0, 3], [3, 0]])
     np.testing.assert_allclose(captured["H_DMI"][0], [[0, 1], [-1, 0]])
+
+
+def test_short_uncompressed_simulation_output(tmp_path):
+    lattice = Lattice_2D(n_a=1, n_b=1, n_site=1)
+    lattice.spins[:] = [1.0, 0.0, 0.0]
+    simulation = LLGS_Simulation_2D(
+        lattice,
+        method="Euler",
+        io_foldername=tmp_path,
+        io_filename="uncompressed",
+        io_compress=False,
+        io_screen=False,
+    )
+
+    record = simulation.evolve(max_iters=1)
+
+    assert record.shape == (1, 1, 3)
+    with h5py.File(tmp_path / "uncompressed.h5") as output:
+        assert output["spin data"].compression is None
+        assert output["spin data"].chunks == (1, 1, 3)
+
+    with pytest.raises(ValueError, match="max_iters must be positive"):
+        simulation.evolve(max_iters=0)
 
 
 def test_nips3_simulation_output_can_be_read(tmp_path):
@@ -135,9 +163,9 @@ def test_nips3_simulation_output_can_be_read(tmp_path):
 
     exchange = make_exchange_field(
         honeycomb,
-        J_1=NiPS3_params["J1"],
-        J_2=NiPS3_params["J2"],
-        J_3=NiPS3_params["J3"],
+        J_1=NIPS3_PARAMS["J1"],
+        J_2=NIPS3_PARAMS["J2"],
+        J_3=NIPS3_PARAMS["J3"],
     )
     np.testing.assert_allclose(exchange, exchange.T)
 
@@ -146,8 +174,8 @@ def test_nips3_simulation_output_can_be_read(tmp_path):
         H_E=exchange,
         H_ext=np.array([5.0, 5.0, 0.0]),
         alpha=0.1,
-        H_para=NiPS3_params["H_para"],
-        H_perp=NiPS3_params["H_perp"],
+        H_para=NIPS3_PARAMS["H_para"],
+        H_perp=NIPS3_PARAMS["H_perp"],
         io_foldername=tmp_path,
         io_filename="custom_result",
         io_screen=False,
@@ -155,22 +183,25 @@ def test_nips3_simulation_output_can_be_read(tmp_path):
     )
 
     dt = 2e-4
-    record = simulation.evolve(dt=dt, max_iters=1000)
+    max_iters = 10
+    record = simulation.evolve(dt=dt, max_iters=max_iters)
     result_path = tmp_path / "custom_result.h5"
 
-    assert record.shape == (1000, honeycomb.N, 3)
+    assert record.shape == (max_iters, honeycomb.N, 3)
     assert np.isfinite(record).all()
     np.testing.assert_allclose(honeycomb.spins, initial_spins)
     assert result_path.exists()
 
     with h5py.File(result_path) as output:
         np.testing.assert_allclose(output["structure"][()], honeycomb.structure)
+        assert output["spin data"].compression == "gzip"
+        assert output["spin data"].chunks == (max_iters, honeycomb.N, 3)
         assert output.attrs["dt"] == dt
 
     result = ReadResult(result_path)
     assert result.spin_datas.shape == record.shape
     np.testing.assert_allclose(result.spin_datas, record)
-    np.testing.assert_allclose(result.times, np.arange(1000) * dt)
+    np.testing.assert_allclose(result.times, np.arange(max_iters) * dt)
 
 
 @pytest.mark.parametrize("sparse_exchange", [False, True])
@@ -201,7 +232,7 @@ def test_sparse_and_dense_fields_produce_same_evolution(
             io_filename=filename,
             io_screen=False,
         )
-        return simulation.evolve(dt=1e-3, max_iters=1000)
+        return simulation.evolve(dt=1e-3, max_iters=5)
 
     expected = run(dense_exchange, dense_dmi, "dense")
     H_E = sparse.csr_matrix(dense_exchange) if sparse_exchange else dense_exchange

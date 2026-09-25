@@ -2,7 +2,11 @@ import numpy as np
 from numba import njit
 from scipy import sparse
 
-from llgs.LLGS_simulation import calculate_spin_velocities_jit
+from llgs.LLGS_simulation import (
+    _get_next_spin_rk4,
+    calculate_spin_velocities_jit,
+    normalize,
+)
 from llgs.spin_velocity import calculate_spin_velocities_csr_jit, csr_matmul_spins
 
 
@@ -132,3 +136,49 @@ def test_sparse_spin_velocities_match_dense():
         common["svels"],
     )
     np.testing.assert_allclose(actual, expected)
+
+
+def test_rk4_uses_independent_stages_without_mutating_input():
+    H_E = np.array([[0.0, 0.3], [0.3, 0.0]])
+    H_DMI = np.zeros((3, 2, 2))
+    spins = np.array([[1.0, 0.0, 0.0], [0.0, 0.6, 0.8]])
+    svels = np.array([[0.01, 0.02, -0.03], [-0.02, 0.01, 0.015]])
+    original_spins = spins.copy()
+    dt = 0.02
+    fields = {
+        "H_E": H_E,
+        "H_perp": 0.2,
+        "H_para": 0.1,
+        "phi_a": 0.3,
+        "H_DMI": H_DMI,
+        "H_ext": np.array([0.1, -0.2, 0.3]),
+        "H_FL": np.array([-0.05, 0.02, 0.01]),
+        "H_DL": np.array([0.03, -0.01, 0.02]),
+        "alpha": 0.05,
+    }
+
+    spin2 = spins + dt / 2 * svels
+    svel2 = calculate_spin_velocities_jit(spins=spin2, svels=svels, **fields)
+    spin3 = spins + dt / 2 * svel2
+    svel3 = calculate_spin_velocities_jit(spins=spin3, svels=svels, **fields)
+    spin4 = spins + dt * svel3
+    svel4 = calculate_spin_velocities_jit(spins=spin4, svels=svels, **fields)
+    expected_spins = normalize(
+        spins + dt / 6 * (svels + 2 * svel2 + 2 * svel3 + svel4)
+    )
+    expected_svels = calculate_spin_velocities_jit(
+        spins=expected_spins,
+        svels=svels,
+        **fields,
+    )
+
+    actual_spins, actual_svels = _get_next_spin_rk4(
+        spins=spins,
+        svels=svels,
+        dt=dt,
+        **fields,
+    )
+
+    np.testing.assert_array_equal(spins, original_spins)
+    np.testing.assert_allclose(actual_spins, expected_spins)
+    np.testing.assert_allclose(actual_svels, expected_svels)
