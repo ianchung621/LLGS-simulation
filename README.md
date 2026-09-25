@@ -51,6 +51,7 @@ Define the simulation parameters such as Gilbert damping coefficient and externa
 
 ```python
 from llgs.LLGS_simulation import LLGS_Simulation_2D
+from param.NiPS3 import NiPS3_params
 
 sim = LLGS_Simulation_2D(honeycomb)
 sim.set_exchange_field(H_E = H_E) # exchange field, unit: Tesla
