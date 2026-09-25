@@ -1,6 +1,6 @@
 import numpy as np
 from pathlib import Path
-from typing import Optional, Sequence, Tuple, Union
+from typing import Literal, Optional, Sequence, Tuple, Union
 
 from numba import njit
 import h5py
@@ -39,7 +39,7 @@ class LLGS_Simulation_2D:
         io_filename: Optional[str] = None,
         io_compress: bool = True,
         io_screen: bool = True,
-        to_sparse: bool = False,
+        matrix_type: Literal["sparse", "dense", "auto"] = "auto",
     ) -> None:
         self.lattice = lattice
         self.N = lattice.N
@@ -54,11 +54,27 @@ class LLGS_Simulation_2D:
                 f"H_E must have shape ({self.N}, {self.N}), got {self.H_E.shape}"
             )
         self.H_DMI = self._validate_dmi(H_DMI)
-        self.to_sparse = to_sparse
-        if to_sparse:
+        if matrix_type not in ("sparse", "dense", "auto"):
+            raise ValueError("matrix_type must be 'sparse', 'dense', or 'auto'")
+        self.matrix_type = matrix_type
+        if matrix_type == "sparse":
             self.H_E = sparse.csr_matrix(self.H_E)
             self.H_DMI = tuple(
                 sparse.csr_matrix(component) for component in self.H_DMI
+            )
+        elif matrix_type == "dense":
+            self.H_E = (
+                self.H_E.toarray()
+                if sparse.issparse(self.H_E)
+                else np.asarray(self.H_E)
+            )
+            self.H_DMI = np.stack(
+                [
+                    component.toarray()
+                    if sparse.issparse(component)
+                    else np.asarray(component)
+                    for component in self.H_DMI
+                ]
             )
         self.H_ext = np.zeros(3) if H_ext is None else np.asarray(H_ext)
         self.H_FL = np.zeros(3) if H_FL is None else np.asarray(H_FL)

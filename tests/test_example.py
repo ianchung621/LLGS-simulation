@@ -244,7 +244,7 @@ def test_sparse_fields_are_normalized_without_densifying():
     )
 
 
-def test_to_sparse_converts_dense_fields_to_csr():
+def test_sparse_matrix_type_converts_dense_fields_to_csr():
     lattice = Lattice_2D(n_a=1, n_b=1, n_site=2)
     exchange = np.array([[0.0, 1.0], [1.0, 0.0]])
     dmi = np.zeros((3, 2, 2))
@@ -254,13 +254,37 @@ def test_to_sparse_converts_dense_fields_to_csr():
         lattice,
         H_E=exchange,
         H_DMI=dmi,
-        to_sparse=True,
+        matrix_type="sparse",
     )
 
-    assert simulation.to_sparse is True
+    assert simulation.matrix_type == "sparse"
     assert sparse.isspmatrix_csr(simulation.H_E)
     assert isinstance(simulation.H_DMI, tuple)
     assert all(sparse.isspmatrix_csr(component) for component in simulation.H_DMI)
     np.testing.assert_allclose(simulation.H_E.toarray(), exchange)
     for actual, expected in zip(simulation.H_DMI, dmi):
         np.testing.assert_allclose(actual.toarray(), expected)
+
+
+def test_dense_matrix_type_converts_sparse_fields_to_arrays():
+    lattice = Lattice_2D(n_a=1, n_b=1, n_site=2)
+    exchange = sparse.csr_matrix([[0.0, 1.0], [1.0, 0.0]])
+    dmi = tuple(sparse.csr_matrix((2, 2)) for _ in range(3))
+
+    simulation = LLGS_Simulation_2D(
+        lattice,
+        H_E=exchange,
+        H_DMI=dmi,
+        matrix_type="dense",
+    )
+
+    assert simulation.matrix_type == "dense"
+    assert isinstance(simulation.H_E, np.ndarray)
+    assert isinstance(simulation.H_DMI, np.ndarray)
+    assert simulation.H_DMI.shape == (3, 2, 2)
+
+
+def test_matrix_type_validation():
+    lattice = Lattice_2D(n_a=1, n_b=1, n_site=1)
+    with pytest.raises(ValueError, match="matrix_type"):
+        LLGS_Simulation_2D(lattice, matrix_type="invalid")
