@@ -84,7 +84,8 @@ def test_honeycomb_lattice_and_zigzag_initialization(tmp_path):
     honeycomb.output_lattice_structure(output_path)
     assert output_path.read_text().splitlines()[0] == "particle idx,a,b,site,x,y"
 
-    honeycomb.plot(draw_unitcell=True)
+    figure, axes = honeycomb.plot(draw_unitcell=True)
+    assert figure.axes[0] is axes
     assert plt.get_fignums()
     plt.close("all")
 

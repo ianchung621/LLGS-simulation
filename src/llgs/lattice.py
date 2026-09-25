@@ -1,7 +1,4 @@
-import matplotlib.colors as mplcolors
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.patches import Polygon
 
 
 def normalize(spins):
@@ -139,47 +136,12 @@ class Lattice_2D:
         self.spins = normalize(self.spins)
 
     def plot(self, arrowscale=0.3, annotate_idx=False, draw_unitcell=False):
-        x = self.positions[:, 0]
-        y = self.positions[:, 1]
-        sx = self.spins[:, 0]
-        sy = self.spins[:, 1]
-        sz = self.spins[:, 2]
+        """Plot this lattice and its current spin configuration."""
+        from .plotting import _plot_lattice
 
-        plt.style.use("dark_background")
-        plt.set_cmap("bwr")
-        fig, ax = plt.subplots()
-        cmap = plt.get_cmap("bwr")
-        norm = mplcolors.Normalize(vmin=-1, vmax=1)
-        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-        plt.colorbar(sm, ax=ax)
-        ax.scatter(x, y, c="yellow", s=2)
-        if np.linalg.norm(sx) == np.linalg.norm(sy) == 0 and np.linalg.norm(sz) != 0:
-            ax.scatter(x, y, c=sz, s=2, norm=norm)
-        elif np.linalg.norm(sx) != 0 or np.linalg.norm(sy) != 0:
-            ax.quiver(x, y, sx * arrowscale, sy * arrowscale, sz, norm=norm)
-        if annotate_idx:
-            for i, (x_pos, y_pos) in enumerate(zip(x, y)):
-                ax.annotate(
-                    str(i),
-                    (x_pos, y_pos),
-                    xycoords="data",
-                    xytext=(1.5, 1.5),
-                    textcoords="offset points",
-                )
-
-        if draw_unitcell:
-            if not self.has_geometry:
-                raise ValueError("geometry is required to draw the unit cell")
-            origin = np.zeros(2)
-            v3 = self.r_a + self.r_b
-            unit_cell = Polygon(
-                [origin, self.r_a, v3, self.r_b],
-                closed=True,
-                edgecolor="blue",
-                facecolor="lightblue",
-                alpha=0.5,
-            )
-            ax.add_patch(unit_cell)
-
-        ax.set_aspect("equal")
-        ax.axis("off")
+        return _plot_lattice(
+            self,
+            arrowscale=arrowscale,
+            annotate_idx=annotate_idx,
+            draw_unitcell=draw_unitcell,
+        )

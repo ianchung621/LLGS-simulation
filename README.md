@@ -99,7 +99,7 @@ from llgs import ReadResult
 results = ReadResult(f'Data/NiPS3/results_RK4.h5')
 
 # Create an animation of spin dynamics and save to gif or mp4
-results.animate(save_fn = f'Data/NiPS3/movie.gif') 
+results.animate(period=50, save_fn='Data/NiPS3/movie.gif')
 ```
 
 ### Example Output
