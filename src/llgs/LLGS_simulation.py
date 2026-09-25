@@ -1,7 +1,7 @@
 import numpy as np
 from pathlib import Path
 from numba import njit
-from core.lattice import lattice_2D
+from .lattice import lattice_2D
 import h5py
 from tqdm import tqdm
 
@@ -259,5 +259,4 @@ def _get_next_spin_rk4(H_E,H_perp,H_para,phi_a,H_DMI,H_ext,H_FL,H_DL,alpha,
                                             next_spins,svels)
 
     return next_spins, next_svels
-
 

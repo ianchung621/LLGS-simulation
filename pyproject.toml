@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llgs-simulation"
+version = "0.1.0"
+description = "Spin-dynamics simulations using the Landau-Lifshitz-Gilbert-Slonczewski equation"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "h5py",
+    "matplotlib",
+    "numba",
+    "numpy",
+    "pandas",
+    "scipy",
+    "tqdm",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

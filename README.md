@@ -15,7 +15,7 @@ Below is a step-by-step demonstration of how to use the repository to simulate s
 The `lattice.py` module allows you to define a spin lattice. Here's an example of creating a hexagonal lattice:
 
 ```python
-from core.lattice import lattice_2D
+from llgs.lattice import lattice_2D
 
 honeycomb = lattice_2D(n_a = 10, n_b = 8, n_site = 2) # 10 unit-cell on a-axis, 8 on b-axis, each unit cell contains 2 sites
 
@@ -50,7 +50,7 @@ honeycomb.plot()
 Define the simulation parameters such as Gilbert damping coefficient and external magnetic field:
 
 ```python
-from core.LLGS_simulation import LLGS_Simulation_2D
+from llgs.LLGS_simulation import LLGS_Simulation_2D
 
 sim = LLGS_Simulation_2D(honeycomb)
 sim.set_exchange_field(H_E = H_E) # exchange field, unit: Tesla
@@ -79,7 +79,7 @@ sim.evolve(honeycomb,
 The `read_result.py` module reads the simulation results and creates visualizations. Here is how you can animate the spin dynamics:
 
 ```python
-from core.read_results import ReadResult
+from llgs.read_results import ReadResult
 
 # Read the results from the HDF5 file
 results = ReadResult(f'Data/NiPS3/results_RK4.h5')
