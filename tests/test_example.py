@@ -92,8 +92,12 @@ def test_honeycomb_lattice_and_zigzag_initialization(tmp_path):
 def test_fields_are_normalized_when_evolution_starts(tmp_path, monkeypatch):
     lattice = lattice_2D(n_a=1, n_b=1, n_site=2)
     lattice.spins[:] = [1, 0, 0]
+    with pytest.raises(ValueError, match="H_DMI must have shape"):
+        LLGS_Simulation_2D(lattice, H_DMI=np.zeros((2, 2, 2)))
+
     raw_exchange = np.array([[0.0, 4.0], [2.0, 0.0]])
-    raw_dmi_x = np.array([[0.0, 4.0], [2.0, 0.0]])
+    raw_dmi = np.zeros((3, 2, 2))
+    raw_dmi[0] = [[0.0, 4.0], [2.0, 0.0]]
     captured = {}
 
     def capture_step(**fields):
@@ -105,7 +109,7 @@ def test_fields_are_normalized_when_evolution_starts(tmp_path, monkeypatch):
     simulation = LLGS_Simulation_2D(
         lattice,
         H_E=raw_exchange,
-        H_DMI_x=raw_dmi_x,
+        H_DMI=raw_dmi,
         method="Euler",
         io_foldername=tmp_path,
         io_screen=False,
@@ -113,6 +117,7 @@ def test_fields_are_normalized_when_evolution_starts(tmp_path, monkeypatch):
     simulation.evolve(max_iters=1000)
 
     np.testing.assert_array_equal(simulation.H_E, raw_exchange)
+    np.testing.assert_array_equal(simulation.H_DMI, raw_dmi)
     np.testing.assert_allclose(captured["H_E"], [[0, 3], [3, 0]])
     np.testing.assert_allclose(captured["H_DMI"][0], [[0, 1], [-1, 0]])
 

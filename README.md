@@ -1,6 +1,6 @@
 # LLGS Simulation
 
-This repository provides a framework for simulating and analyzing spin dynamics using the Landau-Lifshitz-Gilbert-Slonczewski (LLGS) equation. The repository includes the following core modules:
+This repository provides a framework for simulating and analyzing spin dynamics using the Landau-Lifshitz-Gilbert-Slonczewski (LLGS) equation on 2D. The repository includes the following core modules:
 
 1. **`lattice.py`**: Creates a lattice object representing the spin configuration.
 2. **`LLGS_simulation.py`**: Performs the LLGS simulation and stores the results in an HDF5 file.
