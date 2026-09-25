@@ -42,7 +42,7 @@ Repository = "https://github.com/ianchung621/LLGS-simulation.git"
 Issues = "https://github.com/ianchung621/LLGS-simulation/issues"
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "pytest-cov"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
