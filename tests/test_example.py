@@ -6,9 +6,7 @@ import numpy as np
 import pytest
 from scipy import sparse
 
-from llgs.LLGS_simulation import LLGS_Simulation_2D
-from llgs.lattice import lattice_2D
-from llgs.read_results import ReadResult
+from llgs import LLGS_Simulation_2D, Lattice_2D, ReadResult
 from param.NiPS3 import NiPS3_params
 
 
@@ -16,7 +14,7 @@ simulation_module = importlib.import_module("llgs.LLGS_simulation")
 
 
 def make_honeycomb(n_a=3, n_b=2):
-    return lattice_2D(
+    return Lattice_2D(
         n_a=n_a,
         n_b=n_b,
         n_site=2,
@@ -24,8 +22,8 @@ def make_honeycomb(n_a=3, n_b=2):
         r_b=np.array([0.5 * np.sqrt(3), 1.5]),
         r_site=np.array(
             [
-                [0.5 * np.sqrt(3), 0.5],
-                [np.sqrt(3), 1],
+                [1 / 3, 1 / 3],
+                [2 / 3, 2 / 3],
             ]
         ),
     )
@@ -44,14 +42,14 @@ def make_exchange_field(honeycomb, J_1=0, J_2=0, J_3=0):
 
 
 def test_lattice_constructor_requires_complete_geometry():
-    lattice = lattice_2D(n_a=2, n_b=1, n_site=1)
+    lattice = Lattice_2D(n_a=2, n_b=1, n_site=1)
 
     assert lattice.positions.shape == (2, 2)
     assert lattice.structure.shape == (2, 3)
     assert not lattice.has_geometry
 
     with pytest.raises(ValueError, match="must be provided together"):
-        lattice_2D(
+        Lattice_2D(
             n_a=2,
             n_b=1,
             n_site=1,
@@ -70,6 +68,7 @@ def test_honeycomb_lattice_and_zigzag_initialization(tmp_path):
         honeycomb.positions[:2],
         [[0.5 * np.sqrt(3), 0.5], [np.sqrt(3), 1]],
     )
+    np.testing.assert_allclose(honeycomb.r_site, [[1 / 3, 1 / 3], [2 / 3, 2 / 3]])
 
     honeycomb.initialize_spin(
         {
@@ -91,7 +90,7 @@ def test_honeycomb_lattice_and_zigzag_initialization(tmp_path):
 
 
 def test_fields_are_normalized_when_evolution_starts(tmp_path, monkeypatch):
-    lattice = lattice_2D(n_a=1, n_b=1, n_site=2)
+    lattice = Lattice_2D(n_a=1, n_b=1, n_site=2)
     lattice.spins[:] = [1, 0, 0]
     with pytest.raises(ValueError, match="H_DMI must have shape"):
         LLGS_Simulation_2D(lattice, H_DMI=np.zeros((2, 2, 2)))
@@ -188,7 +187,7 @@ def test_sparse_and_dense_fields_produce_same_evolution(
     )
 
     def run(H_E, H_DMI, filename):
-        lattice = lattice_2D(n_a=1, n_b=1, n_site=2)
+        lattice = Lattice_2D(n_a=1, n_b=1, n_site=2)
         lattice.spins[:] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
         simulation = LLGS_Simulation_2D(
             lattice,
@@ -215,7 +214,7 @@ def test_sparse_and_dense_fields_produce_same_evolution(
 
 
 def test_sparse_field_validation():
-    lattice = lattice_2D(n_a=1, n_b=1, n_site=2)
+    lattice = Lattice_2D(n_a=1, n_b=1, n_site=2)
     with pytest.raises(ValueError, match="H_E must have shape"):
         LLGS_Simulation_2D(lattice, H_E=sparse.eye(3))
     with pytest.raises(ValueError, match="sequence of three"):
@@ -225,7 +224,7 @@ def test_sparse_field_validation():
 
 
 def test_sparse_fields_are_normalized_without_densifying():
-    lattice = lattice_2D(n_a=1, n_b=1, n_site=2)
+    lattice = Lattice_2D(n_a=1, n_b=1, n_site=2)
     exchange = sparse.csr_matrix([[0.0, 4.0], [2.0, 0.0]])
     dmi = (
         sparse.csr_matrix([[0.0, 4.0], [2.0, 0.0]]),
@@ -246,7 +245,7 @@ def test_sparse_fields_are_normalized_without_densifying():
 
 
 def test_to_sparse_converts_dense_fields_to_csr():
-    lattice = lattice_2D(n_a=1, n_b=1, n_site=2)
+    lattice = Lattice_2D(n_a=1, n_b=1, n_site=2)
     exchange = np.array([[0.0, 1.0], [1.0, 0.0]])
     dmi = np.zeros((3, 2, 2))
     dmi[2] = [[0.0, 0.2], [-0.2, 0.0]]

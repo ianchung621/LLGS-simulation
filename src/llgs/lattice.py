@@ -8,9 +8,31 @@ def normalize(spins):
     return spins / np.linalg.norm(spins, axis=1, keepdims=True)
 
 
-class lattice_2D:
+class Lattice_2D:
     def __init__(self, n_a, n_b, n_site, r_a=None, r_b=None, r_site=None):
-        """Create a two-dimensional spin lattice with optional geometry."""
+        """Create a two-dimensional spin lattice.
+
+        Parameters
+        ----------
+        n_a, n_b : int
+            Number of unit cells along the two lattice vectors.
+        n_site : int
+            Number of sites in each unit cell.
+        r_a, r_b : array-like of shape (2,), optional
+            Cartesian lattice vectors. Geometry is omitted when these and
+            ``r_site`` are all ``None``.
+        r_site : array-like of shape (n_site, 2), optional
+            Fractional site coordinates within a unit cell. A row ``(u, v)``
+            places that site at ``u * r_a + v * r_b`` relative to the cell
+            origin. It must be supplied together with ``r_a`` and ``r_b``.
+
+        Notes
+        -----
+        The public arrays ``tags``, ``positions``, ``spins``,
+        ``spin_velocities``, and ``structure`` contain the lattice state.
+        ``structure`` has columns ``a, b, site`` and, when geometry is
+        provided, the Cartesian columns ``x, y``.
+        """
         geometry = (r_a, r_b, r_site)
         if any(value is not None for value in geometry) and not all(
             value is not None for value in geometry
@@ -59,10 +81,12 @@ class lattice_2D:
                 )
 
             a, b, site = self.tags.T
+            site_coordinates = self.r_site[site]
             self.positions = (
                 a[:, None] * self.r_a
                 + b[:, None] * self.r_b
-                + self.r_site[site]
+                + site_coordinates[:, 0, None] * self.r_a
+                + site_coordinates[:, 1, None] * self.r_b
             )
             self.structure = np.column_stack((self.tags, self.positions))
         else:

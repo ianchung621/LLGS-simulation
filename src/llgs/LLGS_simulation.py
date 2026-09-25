@@ -7,7 +7,7 @@ import h5py
 from scipy import sparse
 from tqdm import tqdm
 
-from .lattice import lattice_2D
+from .lattice import Lattice_2D
 from .spin_velocity import (
     calculate_spin_velocities_csr_jit,
     calculate_spin_velocities_jit,
@@ -24,7 +24,7 @@ class LLGS_Simulation_2D:
 
     def __init__(
         self,
-        lattice: lattice_2D,
+        lattice: Lattice_2D,
         H_E: Optional[Matrix] = None,
         H_DMI: Optional[DMIField] = None,
         H_ext: Optional[Sequence[float]] = None,

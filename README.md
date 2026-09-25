@@ -1,10 +1,17 @@
 # LLGS Simulation
 
-This repository provides a framework for simulating and analyzing spin dynamics using the Landau-Lifshitz-Gilbert-Slonczewski (LLGS) equation on 2D. The repository includes the following core modules:
+This repository provides a framework for simulating and analyzing spin dynamics using the Landau-Lifshitz-Gilbert-Slonczewski (LLGS) equation on 2D lattice. Supports antiferromagnetism and spin orbit torque.
 
-1. **`lattice.py`**: Creates a lattice object representing the spin configuration.
-2. **`LLGS_simulation.py`**: Performs the LLGS simulation and stores the results in an HDF5 file.
-3. **`read_result.py`**: Reads the HDF5 file and creates visualizations, including animations of spin dynamics.
+## Install
+
+LLGS Simulation requires Python 3.9 or newer. Install it directly from
+[GitHub](https://github.com/ianchung621/LLGS-simulation):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install git+https://github.com/ianchung621/LLGS-simulation.git
+```
 
 ## Example Usage
 
@@ -15,16 +22,16 @@ Below is a step-by-step demonstration of how to use the repository to simulate s
 The `lattice.py` module allows you to define a spin lattice. Here's an example of creating a hexagonal lattice:
 
 ```python
-from llgs.lattice import lattice_2D
+from llgs import Lattice_2D
 
-honeycomb = lattice_2D(
+honeycomb = Lattice_2D(
     n_a = 10, n_b = 8, n_site = 2,
-    r_a = np.array([np.sqrt(3), 0]), # basis vector in a-axis
-    r_b = np.array([0.5*np.sqrt(3), 1.5]), # basis vector in b-axis
-    r_site = np.array((
-    [0.5*np.sqrt(3), 0.5], # location in unit-cell for first site
-    [np.sqrt(3), 1] # location in unit-cell for second site
-    ))
+    r_a = [np.sqrt(3), 0], # basis vector in a-axis
+    r_b = [0.5*np.sqrt(3), 1.5], # basis vector in b-axis
+    r_site = [
+    [1/3, 1/3], # fractional coordinates of first site
+    [2/3, 2/3] # fractional coordinates of second site
+    ]
 )
 honeycomb.plot(draw_unitcell=True)
 ```
@@ -49,7 +56,7 @@ honeycomb.plot()
 Define the simulation parameters such as Gilbert damping coefficient and external magnetic field:
 
 ```python
-from llgs.LLGS_simulation import LLGS_Simulation_2D
+from llgs import LLGS_Simulation_2D
 from param.NiPS3 import NiPS3_params
 
 sim = LLGS_Simulation_2D(
@@ -84,7 +91,7 @@ sim.evolve(dt = 2e-4, # time step, unit: ps
 The `read_result.py` module reads the simulation results and creates visualizations. Here is how you can animate the spin dynamics:
 
 ```python
-from llgs.read_results import ReadResult
+from llgs import ReadResult
 
 # Read the results from the HDF5 file
 results = ReadResult(f'Data/NiPS3/results_RK4.h5')
