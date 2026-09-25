@@ -4,6 +4,7 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+from scipy import sparse
 
 from llgs.LLGS_simulation import LLGS_Simulation_2D
 from llgs.lattice import lattice_2D
@@ -170,3 +171,97 @@ def test_nips3_simulation_output_can_be_read(tmp_path):
     assert result.spin_datas.shape == record.shape
     np.testing.assert_allclose(result.spin_datas, record)
     np.testing.assert_allclose(result.times, np.arange(1000) * dt)
+
+
+@pytest.mark.parametrize("sparse_exchange", [False, True])
+@pytest.mark.parametrize("sparse_dmi", [False, True])
+def test_sparse_and_dense_fields_produce_same_evolution(
+    tmp_path, sparse_exchange, sparse_dmi
+):
+    dense_exchange = np.array([[0.0, 0.4], [0.2, 0.0]])
+    dense_dmi = np.array(
+        [
+            [[0.0, 0.05], [-0.01, 0.0]],
+            [[0.0, -0.03], [0.01, 0.0]],
+            [[0.0, 0.02], [-0.04, 0.0]],
+        ]
+    )
+
+    def run(H_E, H_DMI, filename):
+        lattice = lattice_2D(n_a=1, n_b=1, n_site=2)
+        lattice.spins[:] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+        simulation = LLGS_Simulation_2D(
+            lattice,
+            H_E=H_E,
+            H_DMI=H_DMI,
+            H_ext=np.array([0.1, 0.0, 0.2]),
+            alpha=0.1,
+            method="RK4",
+            io_foldername=tmp_path,
+            io_filename=filename,
+            io_screen=False,
+        )
+        return simulation.evolve(dt=1e-3, max_iters=1000)
+
+    expected = run(dense_exchange, dense_dmi, "dense")
+    H_E = sparse.csr_matrix(dense_exchange) if sparse_exchange else dense_exchange
+    H_DMI = (
+        tuple(sparse.csr_matrix(component) for component in dense_dmi)
+        if sparse_dmi
+        else dense_dmi
+    )
+    actual = run(H_E, H_DMI, f"sparse-{sparse_exchange}-{sparse_dmi}")
+    np.testing.assert_allclose(actual, expected)
+
+
+def test_sparse_field_validation():
+    lattice = lattice_2D(n_a=1, n_b=1, n_site=2)
+    with pytest.raises(ValueError, match="H_E must have shape"):
+        LLGS_Simulation_2D(lattice, H_E=sparse.eye(3))
+    with pytest.raises(ValueError, match="sequence of three"):
+        LLGS_Simulation_2D(lattice, H_DMI=sparse.eye(2))
+    with pytest.raises(ValueError, match="contain three"):
+        LLGS_Simulation_2D(lattice, H_DMI=(sparse.eye(2), sparse.eye(2)))
+
+
+def test_sparse_fields_are_normalized_without_densifying():
+    lattice = lattice_2D(n_a=1, n_b=1, n_site=2)
+    exchange = sparse.csr_matrix([[0.0, 4.0], [2.0, 0.0]])
+    dmi = (
+        sparse.csr_matrix([[0.0, 4.0], [2.0, 0.0]]),
+        sparse.csr_matrix((2, 2)),
+        sparse.csr_matrix((2, 2)),
+    )
+    simulation = LLGS_Simulation_2D(lattice, H_E=exchange, H_DMI=dmi)
+
+    use_sparse, normalized_exchange, normalized_dmi = simulation._prepare_fields()
+
+    assert use_sparse
+    assert sparse.isspmatrix_csr(normalized_exchange)
+    assert sparse.isspmatrix_csr(normalized_dmi)
+    np.testing.assert_allclose(normalized_exchange.toarray(), [[0, 3], [3, 0]])
+    np.testing.assert_allclose(
+        normalized_dmi[:2].toarray(), [[0, 1], [-1, 0]]
+    )
+
+
+def test_to_sparse_converts_dense_fields_to_csr():
+    lattice = lattice_2D(n_a=1, n_b=1, n_site=2)
+    exchange = np.array([[0.0, 1.0], [1.0, 0.0]])
+    dmi = np.zeros((3, 2, 2))
+    dmi[2] = [[0.0, 0.2], [-0.2, 0.0]]
+
+    simulation = LLGS_Simulation_2D(
+        lattice,
+        H_E=exchange,
+        H_DMI=dmi,
+        to_sparse=True,
+    )
+
+    assert simulation.to_sparse is True
+    assert sparse.isspmatrix_csr(simulation.H_E)
+    assert isinstance(simulation.H_DMI, tuple)
+    assert all(sparse.isspmatrix_csr(component) for component in simulation.H_DMI)
+    np.testing.assert_allclose(simulation.H_E.toarray(), exchange)
+    for actual, expected in zip(simulation.H_DMI, dmi):
+        np.testing.assert_allclose(actual.toarray(), expected)

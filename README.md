@@ -65,6 +65,11 @@ sim = LLGS_Simulation_2D(
 )
 ```
 
+`H_E` may be a dense `(N, N)` array or a SciPy sparse matrix. For sparse DMI,
+pass `H_DMI` as a sequence of three sparse `(N, N)` matrices, one for each
+Cartesian component. Dense DMI remains a `(3, N, N)` array. Set
+`to_sparse=True` to convert dense exchange and DMI inputs to CSR matrices.
+
 ### 4. Running the Simulation
 
 Run the simulation for a specified number of steps and save the results:
