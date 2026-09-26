@@ -1,5 +1,10 @@
 # LLGS Simulation
 
+[![Tests](https://github.com/ianchung621/LLGS-simulation/actions/workflows/test.yml/badge.svg)](https://github.com/ianchung621/LLGS-simulation/actions/workflows/test.yml)
+[![Coverage](https://codecov.io/gh/ianchung621/LLGS-simulation/branch/main/graph/badge.svg)](https://codecov.io/gh/ianchung621/LLGS-simulation)
+![Python](https://img.shields.io/badge/python-3.9--3.13-blue)
+![OS](https://img.shields.io/badge/OS-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)
+
 This package provides tools for simulating and analyzing spin dynamics using
 the Landau-Lifshitz-Gilbert-Slonczewski (LLGS) equation on two-dimensional
 lattices. It supports antiferromagnetic exchange, DMI, anisotropy, external
